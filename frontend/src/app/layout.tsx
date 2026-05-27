@@ -11,8 +11,15 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'BOXMEOUT — Boxing Prediction Market on Stellar',
+  title: {
+    default: 'BoxMeOut — Boxing Prediction Markets',
+    template: '%s — BoxMeOut',
+  },
   description: 'Decentralized boxing prediction market powered by Stellar Soroban smart contracts.',
+  openGraph: {
+    siteName: 'BoxMeOut',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element {
