@@ -4,9 +4,10 @@
 // ============================================================
 
 import type { Request, Response } from 'express';
-import { Keypair } from '@stellar/stellar-sdk';
+import { Keypair, Address, xdr } from '@stellar/stellar-sdk';
 import { AppError } from '../../utils/AppError';
 import * as StellarService from '../../services/StellarService';
+import * as BetService from '../../services/BetService';
 import * as OracleService from '../../oracle/OracleService';
 import { verifyToken } from '../../services/totp.service';
 import { db } from '../../services/MarketService';
@@ -44,14 +45,21 @@ export async function flagDispute(
     throw new AppError(400, 'Market must be resolved to dispute');
   }
 
-  // Assume admin address from env or user
-  const adminAddress = process.env.ADMIN_ADDRESS ?? 'G...'; // TODO: get from user
+  // Get admin address from env
+  const adminAddress = process.env.ADMIN_ADDRESS;
+  if (!adminAddress) {
+    throw new AppError(500, 'ADMIN_ADDRESS is not configured on this server');
+  }
+
+  // Build ScVal args for dispute_market(caller: Address, reason: String)
+  const adminScVal = Address.fromString(adminAddress).toScVal();
+  const reasonScVal = xdr.ScVal.scvString(reason);
 
   // Call StellarService
   const txHash = await StellarService.invokeContract(
     market.contract_address,
     'dispute_market',
-    [adminAddress, reason]
+    [adminScVal, reasonScVal],
   );
 
   // Update DB
@@ -140,8 +148,10 @@ export async function resolveDispute(
  * Steps:
  *   1. Require admin JWT (middleware)
  *   2. Validate market exists and is in "open" or "locked" status
- *   3. Call StellarService.invokeContract("cancel_market", [admin, reason])
- *   4. Respond 200 with { tx_hash }
+ *   3. Build ScVal args: [admin_address, reason]
+ *   4. Call StellarService.invokeContract("cancel_market", args)
+ *   5. Update DB status to 'cancelled'
+ *   6. Respond 200 with { tx_hash }
  */
 export async function cancelMarket(
   req: Request,
@@ -163,14 +173,21 @@ export async function cancelMarket(
     throw new AppError(400, 'Market must be open or locked to cancel');
   }
 
-  // Assume admin address from env or user
-  const adminAddress = process.env.ADMIN_ADDRESS ?? 'G...'; // TODO: get from user
+  // Get admin address from env (or use oracle keypair as fallback)
+  const adminAddress = process.env.ADMIN_ADDRESS;
+  if (!adminAddress) {
+    throw new AppError(500, 'ADMIN_ADDRESS is not configured on this server');
+  }
+
+  // Build ScVal args for cancel_market(caller: Address, reason: String)
+  const adminScVal = Address.fromString(adminAddress).toScVal();
+  const reasonScVal = xdr.ScVal.scvString(reason);
 
   // Call StellarService
   const txHash = await StellarService.invokeContract(
     market.contract_address,
     'cancel_market',
-    [adminAddress, reason]
+    [adminScVal, reasonScVal],
   );
 
   // Update DB
@@ -217,4 +234,32 @@ export async function listDisputes(
   );
 
   res.status(200).json(result.rows);
+}
+
+/**
+ * POST /api/admin/cancel/:market_id/refunds
+ * Body: { token_address: string }
+ *
+ * Processes refunds for ALL unclaimed bettors in a cancelled market.
+ * Enqueues notification jobs and attempts on-chain claim_refund for each bettor.
+ *
+ * Steps:
+ *   1. Require admin JWT (middleware)
+ *   2. Validate market is cancelled
+ *   3. Call BetService.processMarketRefunds(market_id, token_address)
+ *   4. Return summary of results
+ */
+export async function processRefunds(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const { market_id } = req.params;
+  const { token_address } = req.body;
+
+  if (!token_address || typeof token_address !== 'string') {
+    throw new AppError(400, 'token_address is required');
+  }
+
+  const result = await BetService.processMarketRefunds(market_id, token_address);
+  res.status(200).json(result);
 }
