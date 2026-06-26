@@ -1,34 +1,31 @@
-import type { Request, Response, NextFunction } from 'express';
-import { ZodSchema, ZodError, ZodIssue } from 'zod';
+import { Request, Response, NextFunction } from "express";
+import { ZodSchema } from "zod";
 
-function formatErrors(err: ZodError) {
-  return err.issues.map((e: ZodIssue) => ({
-    field: e.path.join('.'),
-    message: e.message,
-  }));
+interface ValidateTarget {
+  body?: ZodSchema;
+  query?: ZodSchema;
+  params?: ZodSchema;
 }
 
-export function validateBody(schema: ZodSchema) {
+export function validate(schemas: ValidateTarget) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.body);
-    if (!result.success) {
-      res.status(400).json({ errors: formatErrors(result.error) });
-      return;
-    }
-    req.body = result.data;
-    next();
-  };
-}
+    for (const key of ["body", "query", "params"] as const) {
+      const schema = schemas[key];
+      if (!schema) continue;
 
-export function validateQuery(schema: ZodSchema) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const result = schema.safeParse(req.query);
-    if (!result.success) {
-      res.status(400).json({ errors: formatErrors(result.error) });
-      return;
+      const result = schema.safeParse(req[key]);
+      if (!result.success) {
+        res.status(400).json({
+          error: "Validation failed",
+          code: "VALIDATION_ERROR",
+          details: result.error.flatten(),
+        });
+        return;
+      }
+
+      (req as Record<string, unknown>)[key] = result.data;
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    req.query = result.data as any;
+
     next();
   };
 }

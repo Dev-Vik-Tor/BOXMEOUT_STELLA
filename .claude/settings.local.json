@@ -1,9 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C /c/Users/BlankDev/Desktop/Backup/Desktop/team_softwares/BOXMEOUT_STELLA status)",
-      "Bash(git -C /c/Users/BlankDev/Desktop/Backup/Desktop/team_softwares/BOXMEOUT_STELLA remote -v)",
-      "Bash(git add *)"
+      "PowerShell(Get-ChildItem -Recurse \"c:\\\\Users\\\\BlankDev\\\\Desktop\\\\Backup\\\\Desktop\\\\drips\\\\BOXMEOUT_STELLA\" | Where-Object { !$_.PSIsContainer } | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\(\"c:\\\\Users\\\\BlankDev\\\\Desktop\\\\Backup\\\\Desktop\\\\drips\\\\BOXMEOUT_STELLA\\\\\", \"\"\\) })"
     ]
   }
 }
