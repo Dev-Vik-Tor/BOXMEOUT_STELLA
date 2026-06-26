@@ -34,3 +34,14 @@ backend/src/generated/
 # Temp files
 *.tmp
 *.swp
+
+# ─── Claude / AI tooling ─────────────────────────────────────
+.claude/
+
+# ─── Compiled output (scoped) ────────────────────────────────
+backend/dist/
+backend/build/
+frontend/dist/
+frontend/build/
+indexer/dist/
+indexer/build/
