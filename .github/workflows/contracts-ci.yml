@@ -82,11 +82,21 @@ jobs:
           workspaces: contracts
           shared-key: contracts
 
-      - name: Install system deps for stellar-cli
-        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev pkg-config
-
       - name: Install Stellar CLI
-        run: cargo install --locked stellar-cli
+        env:
+          STELLAR_CLI_VERSION: 28.1.0
+          STELLAR_CLI_SHA256: c1680deee94301d33ada7a17f98411e642a4248c727afbd2e43050d345746462
+        run: |
+          archive="stellar-cli-${STELLAR_CLI_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/stellar/stellar-cli/releases/download/v${STELLAR_CLI_VERSION}/$archive"
+          echo "${STELLAR_CLI_SHA256}  $RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/bin" stellar
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Check Stellar CLI version
+        run: stellar --version
 
       - name: Build (optimised release profile)
         run: stellar contract build
