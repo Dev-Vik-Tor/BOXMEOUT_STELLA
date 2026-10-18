@@ -59,3 +59,67 @@ pub fn last_event_name(env: &Env) -> Symbol {
     Symbol::try_from_val(env, &topics.get(0).expect("event has no topics"))
         .expect("topic 0 is not a Symbol")
 }
+
+/// Budget thresholds for hot contract paths, one per line:
+/// `<name> <max_cpu_instructions> <max_memory_bytes>`.
+const BUDGET_THRESHOLDS: &str = include_str!("../../budget_thresholds.txt");
+
+/// CPU instructions and memory bytes consumed by one measured call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cost {
+    pub cpu_instructions: u64,
+    pub memory_bytes: u64,
+}
+
+/// Runs `f` with the test budget unlimited and returns its result together
+/// with the CPU instructions and memory bytes it consumed.
+pub fn measure<T>(env: &Env, f: impl FnOnce() -> T) -> (T, Cost) {
+    let mut budget = env.cost_estimate().budget();
+    budget.reset_unlimited();
+    let out = f();
+    let budget = env.cost_estimate().budget();
+    let cost = Cost {
+        cpu_instructions: budget.cpu_instruction_cost(),
+        memory_bytes: budget.memory_bytes_cost(),
+    };
+    (out, cost)
+}
+
+/// Asserts that `cost` is within the threshold recorded for `name` in
+/// `contracts/budget_thresholds.txt`.
+///
+/// A name with no recorded threshold fails with the measured values in the
+/// message, so the baseline can be copied straight into the file.
+pub fn assert_within_budget(name: &str, cost: Cost) {
+    let recorded = BUDGET_THRESHOLDS
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .find_map(|line| {
+            let mut fields = line.split_whitespace();
+            if fields.next()? != name {
+                return None;
+            }
+            let max_cpu = fields.next()?.parse::<u64>().ok()?;
+            let max_mem = fields.next()?.parse::<u64>().ok()?;
+            Some((max_cpu, max_mem))
+        });
+
+    let Some((max_cpu, max_mem)) = recorded else {
+        panic!(
+            "no budget threshold recorded for `{name}`; measured cpu_instructions={} memory_bytes={}",
+            cost.cpu_instructions, cost.memory_bytes
+        );
+    };
+
+    assert!(
+        cost.cpu_instructions <= max_cpu,
+        "`{name}` used {} CPU instructions, over the threshold of {max_cpu}",
+        cost.cpu_instructions
+    );
+    assert!(
+        cost.memory_bytes <= max_mem,
+        "`{name}` used {} memory bytes, over the threshold of {max_mem}",
+        cost.memory_bytes
+    );
+}
