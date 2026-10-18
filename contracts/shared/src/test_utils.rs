@@ -1,5 +1,6 @@
 use soroban_sdk::{
-    testutils::Address as _, token, xdr::ContractEventBody, Address, Env, Symbol, TryFromVal, Val, Vec,
+    testutils::Address as _, token, xdr::ContractEventBody, Address, Env, Symbol, TryFromVal, Val,
+    Vec,
 };
 
 /// Returns a default test environment with no special configuration.
@@ -32,7 +33,10 @@ pub fn event_count(env: &Env) -> u32 {
 pub fn event_at(env: &Env, idx: u32) -> (Vec<Val>, Val) {
     use soroban_sdk::testutils::Events as _;
     let all = env.events().all();
-    let event = all.events().get(idx as usize).expect("event index out of range");
+    let event = all
+        .events()
+        .get(idx as usize)
+        .expect("event index out of range");
     let ContractEventBody::V0(body) = &event.body;
     let mut topics = Vec::new(env);
     for topic in body.topics.iter() {
@@ -52,5 +56,6 @@ pub fn last_event(env: &Env) -> (Vec<Val>, Val) {
 /// Returns the first topic of the most recent event as a `Symbol`.
 pub fn last_event_name(env: &Env) -> Symbol {
     let (topics, _) = last_event(env);
-    Symbol::try_from_val(env, &topics.get(0).expect("event has no topics")).expect("topic 0 is not a Symbol")
+    Symbol::try_from_val(env, &topics.get(0).expect("event has no topics"))
+        .expect("topic 0 is not a Symbol")
 }
