@@ -158,6 +158,14 @@ Do not create duplicate test suites in root `__tests__/`, `hooks/__tests__/`, or
 
 ---
 
+## Test Layout
+
+- Hook tests live in `__tests__/hooks/`, one file per hook (`useClaimWinnings.test.ts`).
+- Library tests live in `__tests__/lib/`, one file per module.
+- Component tests sit next to the component: `components/BetForm.tsx` and `components/BetForm.test.tsx`.
+- Add cases to the existing file for a module instead of creating a second one. Duplicate
+  suites drift apart and double the CI time.
+
 ## Tech Stack
 
 | Library | Purpose |
